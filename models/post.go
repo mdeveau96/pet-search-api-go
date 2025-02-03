@@ -10,26 +10,22 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type comment struct {
-	ID primitive.ObjectID `bson:"_id" json:"_id"`
-	
-}
-
 type Post struct {
 	ID        primitive.ObjectID   `bson:"_id" json:"_id"`
 	Title     string               `bson:"title" json:"title"`
 	ImageUrl  string               `bson:"imageUrl" json:"imageUrl"`
 	Content   string               `bson:"content" json:"content"`
+	Creator   User                 `bson:"creator" json:"creator"`
 	Likes     []primitive.ObjectID `bson:"likes" json:"likes"`
-	Comments comment `bson:"comments" json:"comments"`
+	Comments  []Comment            `bson:"comments" json:"comments"`
 	CreatedAt time.Time            `bson:"created_at" json:"created_at"`
 	UpdatedAt time.Time            `bson:"updated_at" json:"updated_at"`
 }
 
-var collection = db.GetClient().Database("petsearch").Collection("posts")
+var postsCollection = db.GetClient().Database("petsearch").Collection("posts")
 
 func FindAllPosts() ([]Post, error) {
-	cursor, err := collection.Find(context.Background(), bson.D{})
+	cursor, err := postsCollection.Find(context.Background(), bson.D{})
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +39,7 @@ func FindAllPosts() ([]Post, error) {
 func FindPost(postId primitive.ObjectID) (Post, error) {
 	filter := bson.D{{Key: "_id", Value: postId}}
 	var result Post
-	err := collection.FindOne(context.Background(), filter).Decode(&result)
+	err := postsCollection.FindOne(context.Background(), filter).Decode(&result)
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -55,7 +51,7 @@ func FindPost(postId primitive.ObjectID) (Post, error) {
 
 func (p *Post) Create() (Post, error) {
 	newPost := Post{ID: primitive.NewObjectID(), Title: p.Title, ImageUrl: p.ImageUrl, Content: p.Content, CreatedAt: time.Now(), UpdatedAt: time.Now()}
-	_, err := collection.InsertOne(context.Background(), newPost)
+	_, err := postsCollection.InsertOne(context.Background(), newPost)
 	if err != nil {
 		return Post{}, err
 	}
@@ -67,13 +63,22 @@ func (p *Post) Update(updatedPost Post) (*mongo.UpdateResult, error) {
 	update := bson.D{
 		{Key: "$set", Value: Post{ID: p.ID, Title: p.Title, ImageUrl: p.ImageUrl, Content: p.Content, CreatedAt: p.CreatedAt, UpdatedAt: time.Now()}},
 	}
-	post, err := collection.UpdateOne(context.Background(), filter, update)
+	post, err := postsCollection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
 		return nil, err
 	}
 	return post, nil
 }
 
-func (p *Post) Delete(postId primitive.ObjectID) {
-
+func Delete(postId primitive.ObjectID) (*mongo.DeleteResult, error) {
+	filter := bson.D{{Key: "_id", Value: postId}}
+	result, err := postsCollection.DeleteOne(context.Background(), filter)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
+
+// func (p *Post) Like(postId primitive.ObjectID) (Post, error) {
+
+// }

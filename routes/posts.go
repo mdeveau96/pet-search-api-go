@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"log"
 	"net/http"
 	"pet-search-backend-go/models"
 
@@ -71,4 +72,34 @@ func updatePost(context *gin.Context) {
 		return
 	}
 	context.JSON(http.StatusOK, gin.H{"message": "Post Updated", "post": result})
+}
+
+func deletePost(context *gin.Context) {
+	postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not find post"})
+		return
+	}
+	result, err := models.Delete(postId)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Unable to delete post", "error": err})
+		return
+	}
+	context.JSON(http.StatusOK, gin.H{"message": "Post deleted", "post": result})
+}
+
+func likePost(context *gin.Context) {
+	// postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+	// if err != nil {
+	// 	context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not read post id param."})
+	// 	return
+	// }
+	// post, err := models.FindPost(postId)
+	// if err != nil {
+	// 	context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not fetch post."})
+	// 	return
+	// }
+	// result, err := post.Like()
+	log.Println(context.Request)
+	context.JSON(http.StatusOK, gin.H{"message": "Post liked"})
 }
