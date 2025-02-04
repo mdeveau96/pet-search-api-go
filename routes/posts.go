@@ -44,6 +44,7 @@ func createPost(context *gin.Context) {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not create post"})
 		return
 	}
+	
 	context.JSON(http.StatusCreated, gin.H{"message": "Post created", "post": newPost})
 }
 

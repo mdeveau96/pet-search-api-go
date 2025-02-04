@@ -7,19 +7,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var secretKey = []byte("pet-search-secret-key")
-
-func createToken(email string) (string, error) {
-	claims := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
-		"sub": email,
-		"iss": "pet-search",
-		"exp": time.Now().Add(time.Hour).Unix(),
-		"iat": time.Now().Unix(),
+func createToken(userId primitive.ObjectID) (string, error) {
+	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":    userId,
+		"iss":    "pet-search",
+		"exp":    time.Now().Add(time.Hour).Unix(),
+		"iat":    time.Now().Unix(),
 	})
-	tokenString, err := claims.SignedString(secretKey)
+	signingKey := []byte("pet-search-api-secret")
+	tokenString, err := claims.SignedString(signingKey)
 	if err != nil {
 		return "", err
 	}
@@ -66,9 +66,9 @@ func login(context *gin.Context) {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Username or Password"})
 		return
 	}
-	token, err := createToken(user.Email)
+	token, err := createToken(user.ID)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not log in user"})
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not log in user", "error": err})
 		return
 	}
 	context.JSON(http.StatusAccepted, gin.H{"message": "Login Successful", "token": token, "user": user.Email})

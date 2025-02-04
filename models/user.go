@@ -1,8 +1,10 @@
 package models
 
 import (
+	"container/list"
 	"context"
 	"pet-search-backend-go/db"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -23,6 +25,7 @@ type User struct {
 	Password    string             `bson:"password" json:"password"`
 	Posts       []Post             `bson:"posts" json:"posts"`
 	MemberOf    []Group            `bson:"member_of" json:"member_of"`
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
 }
 
 var usersCollection = db.GetClient().Database("petsearch").Collection("users")
@@ -49,4 +52,12 @@ func (u *User) AddUser() (User, error) {
 		return User{}, err
 	}
 	return newUser, nil
+}
+
+func (u *User) AddPost(post Post) (User, error) {
+	filter := bson.D{{Key: "_id", Value: u.ID}}
+	userPosts := append(u.Posts, post)
+	update := bson.D{
+		{Key: "$set", Value: {u.Posts: userPosts}},
+	}
 }
