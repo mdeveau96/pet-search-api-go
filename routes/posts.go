@@ -1,11 +1,11 @@
 package routes
 
 import (
-	"log"
 	"net/http"
 	"pet-search-backend-go/models"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -39,12 +39,20 @@ func createPost(context *gin.Context) {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
 		return
 	}
+	userId, _ := primitive.ObjectIDFromHex(context.Request.Header.Get("userId"))
+	post.Creator = userId
 	newPost, err := post.Create()
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not create post"})
 		return
 	}
-	
+	filter := bson.D{{Key: "_id", Value: userId}}
+	user, err := models.FindUser(filter)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not attach post to user account"})
+		return
+	}
+	user.AddPost(newPost)
 	context.JSON(http.StatusCreated, gin.H{"message": "Post created", "post": newPost})
 }
 
@@ -90,17 +98,47 @@ func deletePost(context *gin.Context) {
 }
 
 func likePost(context *gin.Context) {
-	// postId, err := primitive.ObjectIDFromHex(context.Param("id"))
-	// if err != nil {
-	// 	context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not read post id param."})
-	// 	return
-	// }
-	// post, err := models.FindPost(postId)
-	// if err != nil {
-	// 	context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not fetch post."})
-	// 	return
-	// }
-	// result, err := post.Like()
-	log.Println(context.Request)
-	context.JSON(http.StatusOK, gin.H{"message": "Post liked"})
+	postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not read post id param."})
+		return
+	}
+	post, err := models.FindPost(postId)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not fetch post."})
+		return
+	}
+	userId, _ := primitive.ObjectIDFromHex(context.Request.Header.Get("userId"))
+	err = post.Like(userId)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Unable to like post"})
+	}
+	context.JSON(http.StatusOK, gin.H{"message": "Post liked", "post": post})
+}
+
+func postComment(context *gin.Context) {
+	var newComment models.Comment
+	err := context.ShouldBindJSON(&newComment)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
+		return
+	}
+	postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not read post id param."})
+		return
+	}
+	post, err := models.FindPost(postId)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not fetch post."})
+		return
+	}
+	userId, _ := primitive.ObjectIDFromHex(context.Request.Header.Get("userId"))
+	newComment.Creator = userId
+	err = post.AddComment(newComment)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Unable to add coment", "error": err})
+		return
+	}
+	context.JSON(http.StatusOK, gin.H{"message": "Comment added", "post": post})
 }

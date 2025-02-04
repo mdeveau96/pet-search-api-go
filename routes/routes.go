@@ -2,6 +2,7 @@ package routes
 
 import (
 	"pet-search-backend-go/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -12,10 +13,13 @@ func RegisterRoutes(server *gin.Engine) {
 	server.POST("/feed/posts", middleware.Authenticate, createPost)
 	server.PATCH("/feed/posts/:id", middleware.Authenticate, updatePost)
 	server.DELETE("/feed/posts/:id", middleware.Authenticate, deletePost)
-
 	server.POST("/feed/posts/:id/like", middleware.Authenticate, likePost)
+	server.POST("/feed/posts/:id/comment", middleware.Authenticate, postComment)
 
 	// Auth
 	server.POST("/auth/signup", signup)
 	server.POST("/auth/login", login)
+
+	// Account
+	server.GET("/account", middleware.Authenticate, getAccount)
 }

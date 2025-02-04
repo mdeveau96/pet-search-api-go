@@ -1,7 +1,6 @@
 package models
 
 import (
-	"container/list"
 	"context"
 	"pet-search-backend-go/db"
 	"time"
@@ -10,6 +9,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Login struct {
@@ -30,8 +30,7 @@ type User struct {
 
 var usersCollection = db.GetClient().Database("petsearch").Collection("users")
 
-func FindUserByEmail(email string) (User, error) {
-	filter := bson.D{{Key: "email", Value: email}}
+func FindUser(filter bson.D) (User, error) {
 	var result User
 	err := usersCollection.FindOne(context.Background(), filter).Decode(&result)
 	if err != nil {
@@ -46,7 +45,7 @@ func (u *User) AddUser() (User, error) {
 		return User{}, err
 	}
 	u.Password = string(hashedPassword)
-	newUser := User{ID: primitive.NewObjectID(), Username: u.Username, Email: u.Email, PhoneNumber: u.PhoneNumber, Password: u.Password, Posts: u.Posts, MemberOf: u.MemberOf}
+	newUser := User{ID: primitive.NewObjectID(), Username: u.Username, Email: u.Email, PhoneNumber: u.PhoneNumber, Password: u.Password, Posts: u.Posts, MemberOf: u.MemberOf, CreatedAt: time.Now()}
 	_, err = usersCollection.InsertOne(context.Background(), newUser)
 	if err != nil {
 		return User{}, err
@@ -54,10 +53,15 @@ func (u *User) AddUser() (User, error) {
 	return newUser, nil
 }
 
-func (u *User) AddPost(post Post) (User, error) {
+func (u *User) AddPost(post Post) (*mongo.UpdateResult, error) {
 	filter := bson.D{{Key: "_id", Value: u.ID}}
 	userPosts := append(u.Posts, post)
 	update := bson.D{
-		{Key: "$set", Value: {u.Posts: userPosts}},
+		{Key: "$set", Value: bson.D{{Key: "posts", Value: userPosts}}},
 	}
+	result, err := usersCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

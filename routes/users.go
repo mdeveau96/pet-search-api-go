@@ -7,16 +7,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func createToken(userId primitive.ObjectID) (string, error) {
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":    userId,
-		"iss":    "pet-search",
-		"exp":    time.Now().Add(time.Hour).Unix(),
-		"iat":    time.Now().Unix(),
+		"sub": userId,
+		"iss": "pet-search",
+		"exp": time.Now().Add(time.Hour).Unix(),
+		"iat": time.Now().Unix(),
 	})
 	signingKey := []byte("pet-search-api-secret")
 	tokenString, err := claims.SignedString(signingKey)
@@ -53,17 +54,18 @@ func login(context *gin.Context) {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
 		return
 	}
-	user, err := models.FindUserByEmail(credentials.Email)
+	filter := bson.D{{Key: "email", Value: credentials.Email}}
+	user, err := models.FindUser(filter)
 	if err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"message": "Could not find user"})
 		return
 	}
 	if credentials.Email != user.Email {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Username or Password"})
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Username or Password", "error": "email"})
 		return
 	}
 	if !(verifyPassword(user.Password, credentials.Password)) {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Username or Password"})
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Username or Password", "error": "pass"})
 		return
 	}
 	token, err := createToken(user.ID)
