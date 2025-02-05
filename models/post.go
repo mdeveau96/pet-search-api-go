@@ -68,14 +68,18 @@ func (p *Post) Create() (Post, error) {
 	return newPost, nil
 }
 
-func (p *Post) Update(updatedPost Post) (*mongo.UpdateResult, error) {
+func (p *Post) Update(updatedPost Post) (Post, error) {
 	filter := bson.D{{Key: "_id", Value: updatedPost.ID}}
 	update := bson.D{
 		{Key: "$set", Value: Post{ID: p.ID, Title: p.Title, ImageUrl: p.ImageUrl, Content: p.Content, Creator: p.Creator, CreatedAt: p.CreatedAt, UpdatedAt: time.Now()}},
 	}
-	post, err := postsCollection.UpdateOne(context.Background(), filter, update)
+	_, err := postsCollection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
-		return nil, err
+		return Post{}, err
+	}
+	post, err := FindPost(p.ID)
+	if err != nil {
+		return Post{}, err
 	}
 	return post, nil
 }
@@ -89,7 +93,7 @@ func Delete(postId primitive.ObjectID) (*mongo.DeleteResult, error) {
 	return result, nil
 }
 
-func (p *Post) Like(userId primitive.ObjectID) error {
+func (p *Post) Like(userId primitive.ObjectID) (Post, error) {
 	filter := bson.D{{Key: "_id", Value: p.ID}}
 	var userLikes []primitive.ObjectID
 	if !(slices.Contains(p.Likes, userId)) {
@@ -106,12 +110,16 @@ func (p *Post) Like(userId primitive.ObjectID) error {
 	}
 	_, err := postsCollection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
-		return err
+		return Post{}, err
 	}
-	return nil
+	post, err := FindPost(p.ID)
+	if err != nil {
+		return Post{}, err
+	}
+	return post, nil
 }
 
-func (p *Post) AddComment(comment Comment) error {
+func (p *Post) AddComment(comment Comment) (Post, error) {
 	newComment := Comment{ID: primitive.NewObjectID(), Creator: comment.Creator, Content: comment.Content, Likes: comment.Likes, CreatedAt: time.Now(), UpdatedAt: time.Now()}
 	commentsList := append(p.Comments, newComment)
 	filter := bson.D{{Key: "_id", Value: p.ID}}
@@ -120,7 +128,87 @@ func (p *Post) AddComment(comment Comment) error {
 	}
 	_, err := postsCollection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
-		return err
+		return Post{}, err
 	}
-	return nil
+	post, err := FindPost(p.ID)
+	if err != nil {
+		return Post{}, err
+	}
+	return post, nil
+}
+
+func (p *Post) LikeComment(commentId, userId primitive.ObjectID) (Post, error) {
+	filter := bson.D{{Key: "_id", Value: p.ID}}
+	for index, c := range p.Comments {
+		if c.ID == commentId {
+			var userCommentLikes []primitive.ObjectID
+			if !(slices.Contains(c.Likes, userId)) {
+				userCommentLikes = append(c.Likes, userId)
+			} else {
+				for _, id := range c.Likes {
+					if id != userId {
+						userCommentLikes = append(userCommentLikes, id)
+					}
+				}
+			}
+			c = Comment{ID: c.ID, Creator: c.Creator, Content: c.Content, Likes: userCommentLikes, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt}
+			p.Comments[index] = c
+		}
+	}
+	update := bson.D{
+		{Key: "$set", Value: bson.D{{Key: "comments", Value: p.Comments}}},
+	}
+	_, err := postsCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return Post{}, err
+	}
+	post, err := FindPost(p.ID)
+	if err != nil {
+		return Post{}, err
+	}
+	return post, nil
+}
+
+func (p *Post) UpdateComment(comment Comment) (Post, error) {
+	filter := bson.D{{Key: "_id", Value: p.ID}}
+	for index, c := range p.Comments {
+		if c.ID == comment.ID {
+			c = Comment{ID: comment.ID, Creator: c.Creator, Content: comment.Content, Likes: c.Likes, CreatedAt: c.CreatedAt, UpdatedAt: time.Now()}
+			p.Comments[index] = c
+		}
+	}
+	update := bson.D{
+		{Key: "$set", Value: bson.D{{Key: "comments", Value: p.Comments}}},
+	}
+	_, err := postsCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return Post{}, err
+	}
+	post, err := FindPost(p.ID)
+	if err != nil {
+		return Post{}, err
+	}
+	return post, nil
+}
+
+func (p *Post) DeleteComment(commentId primitive.ObjectID) (Post, error) {
+	filter := bson.D{{Key: "_id", Value: p.ID}}
+	var newCommentsList []Comment
+	for _, c := range p.Comments {
+		if c.ID != commentId {
+			newCommentsList = append(newCommentsList, c)
+		}
+	}
+	update := bson.D{
+		{Key: "$set", Value: bson.D{{Key: "comments", Value: newCommentsList}}},
+	}
+	_, err := postsCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return Post{}, err
+	}
+	post, err := FindPost(p.ID)
+	if err != nil {
+		return Post{}, err
+	}
+	return post, nil
 }
