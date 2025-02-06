@@ -8,21 +8,35 @@ import (
 
 func RegisterRoutes(server *gin.Engine) {
 	// Posts
-	server.GET("/feed/posts", middleware.Authenticate, getPosts)
-	server.GET("/feed/posts/:id", middleware.Authenticate, getPost)
-	server.POST("/feed/posts", middleware.Authenticate, createPost)
-	server.PATCH("/feed/posts/:id", middleware.Authenticate, updatePost)
-	server.DELETE("/feed/posts/:id", middleware.Authenticate, deletePost)
-	server.POST("/feed/posts/:id/like", middleware.Authenticate, likePost)
-	server.POST("/feed/posts/:id/comment", middleware.Authenticate, postComment)
-	server.POST("/feed/posts/:id/comment/:commentId/like", middleware.Authenticate, likeComment)
-	server.PATCH("/feed/posts/:id/comment/:commentId", middleware.Authenticate, updateComment)
-	server.DELETE("/feed/posts/:id/comment/:commentId", middleware.Authenticate, deleteComment)
+	postFeed := server.Group("/feed/posts").Use(middleware.Authenticate)
+	{
+		postFeed.GET("/", getPosts)
+		postFeed.POST("/", createPost)
+		postFeed.GET("/:postId", getPost)
+		postFeed.PATCH("/:postId", editPost)
+		postFeed.DELETE("/:postId", deletePost)
+		postFeed.POST("/:postId/like", likePost)
+		postFeed.POST("/:postId/comment", postComment)
+		postFeed.PATCH("/:postId/comment/:commentId", editComment)
+		postFeed.DELETE("/:postId/comment/:commentId", deleteComment)
+		postFeed.POST("/:postId/comment/:commentId/like", likeComment)
+		postFeed.POST("/:postId/comment/:commentId/reply", postReply)
+		postFeed.PATCH("/:postId/comment/:commentId/reply/:replyId", editReply)
+		postFeed.DELETE("/:postId/comment/:commentId/reply/:replyId", deleteReply)
+		postFeed.POST("/:postId/comment/:commentId/reply/:replyId/like", likeReply)
+	}
 
 	// Auth
-	server.POST("/auth/signup", signup)
-	server.POST("/auth/login", login)
+	auth := server.Group("/auth")
+	{
+		auth.POST("/signup", signup)
+		auth.POST("/login", login)
+	}
 
-	// Account
-	server.GET("/account", middleware.Authenticate, getAccount)
+	// User
+	user := server.Group("/users").Use(middleware.Authenticate)
+	{
+		user.GET("/", getUsers)
+		user.GET("/:userId", getUser)
+	}
 }

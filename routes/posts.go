@@ -9,6 +9,31 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type params struct {
+	PostId    primitive.ObjectID
+	CommentId primitive.ObjectID
+	replyId   primitive.ObjectID
+}
+
+func getIdsFromParams(context *gin.Context) (params, error) {
+	postId, err := primitive.ObjectIDFromHex(context.Param("postId"))
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
+		return params{}, err
+	}
+	commentId, err := primitive.ObjectIDFromHex(context.Param("commentId"))
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
+		return params{PostId: postId}, nil
+	}
+	replyId, err := primitive.ObjectIDFromHex(context.Param("replyId"))
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
+		return params{PostId: postId, CommentId: commentId}, nil
+	}
+	return params{PostId: postId, CommentId: commentId, replyId: replyId}, nil
+}
+
 func getPosts(context *gin.Context) {
 	posts, err := models.FindAllPosts()
 	if err != nil {
@@ -19,12 +44,12 @@ func getPosts(context *gin.Context) {
 }
 
 func getPost(context *gin.Context) {
-	postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+	params, err := getIdsFromParams(context)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not read post id param"})
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
 		return
 	}
-	post, err := models.FindPost(postId)
+	post, err := models.FindPost(params.PostId)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not fetch post"})
 		return
@@ -56,25 +81,25 @@ func createPost(context *gin.Context) {
 	context.JSON(http.StatusCreated, gin.H{"message": "Post created", "post": newPost})
 }
 
-func updatePost(context *gin.Context) {
+func editPost(context *gin.Context) {
 	var updatedPost models.Post
 	err := context.ShouldBindJSON(&updatedPost)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data", "error": err})
 		return
 	}
-	postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+	params, err := getIdsFromParams(context)
 	if err != nil {
-		context.JSON(http.StatusNotFound, gin.H{"message": "Could not find post"})
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
 		return
 	}
-	post, err := models.FindPost(postId)
+	post, err := models.FindPost(params.PostId)
 	if err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"message": "Could not find post"})
 		return
 	}
 	updatedPost.CreatedAt = post.CreatedAt
-	updatedPost.ID = postId
+	updatedPost.ID = params.PostId
 	result, err := updatedPost.Update(updatedPost)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not update post", "error": err})
@@ -84,12 +109,12 @@ func updatePost(context *gin.Context) {
 }
 
 func deletePost(context *gin.Context) {
-	postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+	params, err := getIdsFromParams(context)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not find post"})
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
 		return
 	}
-	result, err := models.Delete(postId)
+	result, err := models.Delete(params.PostId)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"message": "Unable to delete post", "error": err})
 		return
@@ -98,12 +123,12 @@ func deletePost(context *gin.Context) {
 }
 
 func likePost(context *gin.Context) {
-	postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+	params, err := getIdsFromParams(context)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not read post id param"})
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
 		return
 	}
-	post, err := models.FindPost(postId)
+	post, err := models.FindPost(params.PostId)
 	if err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"message": "Could not fetch post"})
 		return
@@ -123,12 +148,12 @@ func postComment(context *gin.Context) {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
 		return
 	}
-	postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+	params, err := getIdsFromParams(context)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not read post id param"})
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
 		return
 	}
-	post, err := models.FindPost(postId)
+	post, err := models.FindPost(params.PostId)
 	if err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"message": "Could not fetch post"})
 		return
@@ -144,14 +169,9 @@ func postComment(context *gin.Context) {
 }
 
 func likeComment(context *gin.Context) {
-	postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+	params, err := getIdsFromParams(context)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not read post id param"})
-		return
-	}
-	commentId, err := primitive.ObjectIDFromHex(context.Param("commentId"))
-	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not read comment id param"})
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
 		return
 	}
 	userId, err := primitive.ObjectIDFromHex(context.Request.Header.Get("userId"))
@@ -159,12 +179,12 @@ func likeComment(context *gin.Context) {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not read user id header"})
 		return
 	}
-	post, err := models.FindPost(postId)
+	post, err := models.FindPost(params.PostId)
 	if err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"message": "Could not fetch post"})
 		return
 	}
-	result, err := post.LikeComment(commentId, userId)
+	result, err := post.LikeComment(params.CommentId, userId)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not fetch post"})
 		return
@@ -172,29 +192,24 @@ func likeComment(context *gin.Context) {
 	context.JSON(http.StatusOK, gin.H{"message": "Comment liked", "post": result})
 }
 
-func updateComment(context *gin.Context) {
+func editComment(context *gin.Context) {
 	var updatedComment models.Comment
 	err := context.ShouldBindJSON(&updatedComment)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data", "error": err})
 		return
 	}
-	postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+	params, err := getIdsFromParams(context)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
 		return
 	}
-	commentId, err := primitive.ObjectIDFromHex(context.Param("commentId"))
-	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
-		return
-	}
-	post, err := models.FindPost(postId)
+	post, err := models.FindPost(params.PostId)
 	if err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"message": "Could not fetch post"})
 		return
 	}
-	updatedComment.ID = commentId
+	updatedComment.ID = params.CommentId
 	result, err := post.UpdateComment(updatedComment)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not update comment"})
@@ -203,25 +218,120 @@ func updateComment(context *gin.Context) {
 	context.JSON(http.StatusOK, gin.H{"message": "Updated comment", "post": result})
 }
 
-func deleteComment(context *gin.Context) {
-	postId, err := primitive.ObjectIDFromHex(context.Param("id"))
+func postReply(context *gin.Context) {
+	var reply models.Reply
+	err := context.ShouldBindJSON(&reply)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not read post id param"})
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data", "error": err})
 		return
 	}
-	post, err := models.FindPost(postId)
+	params, err := getIdsFromParams(context)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
+		return
+	}
+	userId, err := primitive.ObjectIDFromHex(context.Request.Header.Get("userId"))
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not read user id header"})
+		return
+	}
+	post, err := models.FindPost(params.PostId)
 	if err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"message": "Could not fetch post"})
 		return
 	}
-	commentId, err := primitive.ObjectIDFromHex(context.Param("commentId"))
+	reply.Creator = userId
+	result, err := post.ReplyToComment(params.CommentId, reply)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not read comment id param"})
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not reply to comment"})
 		return
 	}
-	result, err := post.DeleteComment(commentId)
+	context.JSON(http.StatusOK, gin.H{"message": "Reply posted", "post": result})
+}
+
+func editReply(context *gin.Context) {
+	var updatedReply models.Reply
+	err := context.ShouldBindJSON(&updatedReply)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could delete comment"})
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data", "error": err})
+		return
+	}
+	params, err := getIdsFromParams(context)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
+		return
+	}
+	post, err := models.FindPost(params.PostId)
+	if err != nil {
+		context.JSON(http.StatusNotFound, gin.H{"message": "Could not fetch post"})
+		return
+	}
+	updatedReply.ID = params.replyId
+	result, err := post.EditReply(params.CommentId, updatedReply)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not edit reply"})
+		return
+	}
+	context.JSON(http.StatusOK, gin.H{"message": "Editted reply", "post": result})
+}
+
+func likeReply(context *gin.Context) {
+	params, err := getIdsFromParams(context)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
+		return
+	}
+	userId, err := primitive.ObjectIDFromHex(context.Request.Header.Get("userId"))
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not read user id header"})
+		return
+	}
+	post, err := models.FindPost(params.PostId)
+	if err != nil {
+		context.JSON(http.StatusNotFound, gin.H{"message": "Could not fetch post"})
+		return
+	}
+	result, err := post.LikeReply(params.CommentId, userId, params.replyId)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not like reply"})
+		return
+	}
+	context.JSON(http.StatusOK, gin.H{"message": "Liked reply", "post": result})
+}
+
+func deleteReply(context *gin.Context) {
+	params, err := getIdsFromParams(context)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
+		return
+	}
+	post, err := models.FindPost(params.PostId)
+	if err != nil {
+		context.JSON(http.StatusNotFound, gin.H{"message": "Could not fetch post"})
+		return
+	}
+	result, err := post.DeleteReply(params.CommentId, params.replyId)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not delete reply"})
+		return
+	}
+	context.JSON(http.StatusOK, gin.H{"message": "Deleted reply", "post": result})
+}
+
+func deleteComment(context *gin.Context) {
+	params, err := getIdsFromParams(context)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request data"})
+		return
+	}
+	post, err := models.FindPost(params.PostId)
+	if err != nil {
+		context.JSON(http.StatusNotFound, gin.H{"message": "Could not fetch post"})
+		return
+	}
+	result, err := post.DeleteComment(params.CommentId)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not delete comment"})
 		return
 	}
 	context.JSON(http.StatusOK, gin.H{"message": "Deleted comment", "post": result})

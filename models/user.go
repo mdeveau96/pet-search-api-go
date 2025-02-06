@@ -30,6 +30,18 @@ type User struct {
 
 var usersCollection = db.GetClient().Database("petsearch").Collection("users")
 
+func FindAllUsers() ([]User, error) {
+	cursor, err := usersCollection.Find(context.Background(), bson.D{})
+	if err != nil {
+		return []User{}, err
+	}
+	var users []User
+	if err = cursor.All(context.Background(), &users); err != nil {
+		return []User{}, err
+	}
+	return users, nil
+}
+
 func FindUser(filter bson.D) (User, error) {
 	var result User
 	err := usersCollection.FindOne(context.Background(), filter).Decode(&result)
