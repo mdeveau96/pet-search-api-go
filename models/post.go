@@ -75,7 +75,7 @@ func FindPost(postId primitive.ObjectID) (Post, error) {
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			panic(err)
+			return Post{}, err
 		}
 	}
 	return result, nil

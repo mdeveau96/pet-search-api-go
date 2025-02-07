@@ -77,3 +77,44 @@ func (u *User) AddPost(post Post) (*mongo.UpdateResult, error) {
 	}
 	return result, nil
 }
+
+func (u *User) UpdateUserPosts(newPost Post) error {
+	filter := bson.D{{Key: "_id", Value: u.ID}}
+	var userPostsList []Post
+	for _, post := range u.Posts {
+		if post.ID == newPost.ID {
+			post = newPost
+		}
+		userPostsList = append(userPostsList, post)
+	}
+	update := bson.D{
+		{Key: "$set", Value: bson.D{{Key: "posts", Value: userPostsList}}},
+	}
+	_, err := usersCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return err
+	}
+	_, err = FindUser(bson.D{{Key: "_id", Value: u.ID}})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (u *User) DeleteUserPost(postId primitive.ObjectID) error {
+	filter := bson.D{{Key: "_id", Value: u.ID}}
+	var newPostsList []Post
+	for _, post := range u.Posts {
+		if post.ID != postId {
+			newPostsList = append(newPostsList, post)
+		}
+	}
+	update := bson.D{
+		{Key: "$set", Value: bson.D{{Key: "posts", Value: newPostsList}}},
+	}
+	_, err := usersCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return err
+	}
+	return nil
+}
