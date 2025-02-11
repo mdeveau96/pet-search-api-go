@@ -39,4 +39,12 @@ func RegisterRoutes(server *gin.Engine) {
 		user.GET("/", getUsers)
 		user.GET("/:userId", getUser)
 	}
+
+	// Groups
+	groups := server.Group("/groups").Use(middleware.Authenticate)
+	{
+		groups.GET("/")
+		groups.GET("/:groupId")
+		groups.POST("/:groupId")
+	}
 }
